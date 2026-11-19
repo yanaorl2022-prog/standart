@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Матриця дій вчителя у професійній спільноті</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.min.css">
+<style>
+  body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #eff6ff 0%, #fef3c7 100%); }
+  .fade-in { animation: fadeIn 0.5s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .radio-btn { transition: all 0.2s; cursor: pointer; }
+  .radio-btn:hover { transform: scale(1.05); }
+  .radio-btn.selected { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .progress-bar { transition: width 0.8s ease-in-out; }
+  .tab-active { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+<div class="max-w-7xl mx-auto">
+
+  <!-- Header -->
+  <header class="text-center mb-8 fade-in">
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">📋 Матриця дій вчителя у професійній спільноті</h1>
+    <p class="text-gray-600">Професійний стандарт вчителя 2024 | Наказ МОН № 1225 від 29.08.2024</p>
+    <p class="text-sm text-gray-500 mt-2">Оберіть рівень виконання кожної дії для самооцінювання</p>
+  </header>
+
+  <!-- Progress -->
+  <div class="bg-white rounded-2xl shadow-xl p-6 mb-6 border-l-4 border-blue-600 fade-in">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Прогрес самооцінювання</h2>
+        <p class="text-sm text-gray-500 mt-1">Оцініть кожну дію: <span class="text-red-500 font-semibold">не виконую</span> / <span class="text-yellow-500 font-semibold">частково</span> / <span class="text-green-600 font-semibold">постійно</span></p>
+      </div>
+      <div class="text-right">
+        <div class="text-4xl font-bold text-blue-700" id="overallPercent">0%</div>
+        <div class="text-sm text-gray-500"><span id="completedCount">0</span> / <span id="totalCount">21</span> оцінено</div>
+      </div>
+    </div>
+    <div class="mt-4 bg-gray-200 rounded-full h-4 overflow-hidden">
+      <div id="overallBar" class="progress-bar h-full bg-gradient-to-r from-blue-500 via-yellow-400 to-green-500 rounded-full" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="no-print flex flex-wrap gap-2 mb-6 fade-in" id="tabsContainer"></div>
+
+  <!-- Table Container -->
+  <div id="tableContainer" class="space-y-6"></div>
+
+  <!-- Analytics -->
+  <div class="mt-8 bg-white rounded-2xl shadow-xl p-6 border-l-4 border-yellow-400 fade-in">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">📊 Аналітика за напрямами</h2>
+    <div id="analyticsContainer" class="space-y-3"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="no-print mt-8 flex flex-wrap gap-3 justify-center fade-in">
+    <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg transition">
+      🖨️ Друкувати / Зберегти PDF
+    </button>
+    <button onclick="resetAll()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg transition">
+      🔄 Скинути все
+    </button>
+    <button onclick="showRecommendations()" class="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-800 px-6 py-3 rounded-xl font-semibold shadow-lg transition">
+      💡 Отримати рекомендації
+    </button>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div id="modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-5 rounded-t-2xl flex justify-between items-center">
+      <h3 class="text-xl font-bold">💡 Індивідуальні рекомендації</h3>
+      <button onclick="closeModal()" class="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
+    </div>
+    <div id="modalContent" class="p-6"></div>
+  </div>
+</div>
+
+<script>
+const categories = [
+  { id: 'all', name: 'Усі напрямки', icon: '📋' },
+  { id: 'dev', name: 'Власний професійний розвиток', icon: '🚀' },
+  { id: 'mentor', name: 'Педагогічне наставництво', icon: '🤝' },
+  { id: 'innov', name: 'Інноваційна співпраця', icon: '💡' },
+  { id: 'plan', name: 'Проєктування освітнього процесу', icon: '📐' },
+  { id: 'digital', name: 'Цифрова та мережева взаємодія', icon: '💻' },
+  { id: 'incl', name: 'Інклюзивний та психоемоційний супровід', icon: '❤️' }
+];
+
+const items = [
+  { id: 1, cat: 'dev', desc: 'Опановувати організаційні засади створення й функціонування професійних об\'єднань педагогів.', code: 'Д1.1.З4' },
+  { id: 2, cat: 'dev', desc: 'Брати активну участь у засіданнях, дискусіях і заходах професійних спільнот за потреби.', code: 'Д1.1.У4' },
+  { id: 3, cat: 'dev', desc: 'Взаємодіяти з колегами у спільнотах щодо аналізу проблем власної практики та планування підвищення кваліфікації.', code: 'Д1.1.К1' },
+  { id: 4, cat: 'dev', desc: 'Виявляти самостійність, академічну доброчесність та сприяти розвитку передових педагогічних ідей.', code: 'Д1.1.В1' },
+  { id: 5, cat: 'mentor', desc: 'Знати сучасні методики організації фахової допомоги колегам (наставництво, інтернатура, супервізія).', code: 'Д1.2.З1' },
+  { id: 6, cat: 'mentor', desc: 'Надавати методичну й практичну підтримку іншим учителям в організації освітнього процесу та самовдосконаленні.', code: 'Д1.2.У1' },
+  { id: 7, cat: 'mentor', desc: 'Здійснювати взаємодію у спільнотах як авторитетний та автономний фахівець, утверджуючи високі стандарти професії.', code: 'Д1.2.К1, Д1.2.В1' },
+  { id: 8, cat: 'innov', desc: 'Застосовувати наукові методи пізнання та аналізувати результативність освітніх нововведень.', code: 'Д1.3.З1–Д1.3.З4, Д1.3.У1–Д1.3.У2' },
+  { id: 9, cat: 'innov', desc: 'Взаємодіяти в межах професійних спільнот з питань розроблення, апробації та впровадження інновацій.', code: 'Д1.3.К2' },
+  { id: 10, cat: 'innov', desc: 'Інтегрувати інновації в практику закладу освіти та ділитися результатами досліджень з колегами.', code: 'Д1.3.У3, Д1.3.В1' },
+  { id: 11, cat: 'plan', desc: 'Координувати з колегами спільні підходи до календарно-тематичного та поурочного планування.', code: 'Г1.2.К1' },
+  { id: 12, cat: 'plan', desc: 'Співпрацювати в педагогічній спільноті закладу для колективного створення робочих навчальних програм.', code: 'Г1.2.К3' },
+  { id: 13, cat: 'plan', desc: 'Нести спільну та персональну відповідальність за якість і зміст навчальних програм, створених спільнотою закладу.', code: 'Г1.2.В2' },
+  { id: 14, cat: 'digital', desc: 'Брати участь у роботі професійних онлайн-спільнот та користуватися цифровими фаховими середовищами.', code: 'А3.1.З3' },
+  { id: 15, cat: 'digital', desc: 'Використовувати відкриті електронні освітні ресурси для обміну досвідом та презентувати напрацювання в е-портфоліо.', code: 'А3.1.У3' },
+  { id: 16, cat: 'digital', desc: 'Ініціювати та створювати разом із колегами нові спільноти для обміну досвідом використання цифрових технологій.', code: 'А3.1.К1' },
+  { id: 17, cat: 'digital', desc: 'Спільно розробляти, редагувати й поширювати нові цифрові освітні ресурси у груповій взаємодії.', code: 'А3.2.У2, А3.2.К1, А3.3.У1' },
+  { id: 18, cat: 'digital', desc: 'Надавати систематичну підтримку колегам в опануванні цифрових інструментів та популяризувати цифрову безпеку.', code: 'А3.3.В1, А3.1.В1' },
+  { id: 19, cat: 'incl', desc: 'Працювати в міждисциплінарній команді фахівців супроводу для розроблення та реалізації ІПР учнів з ООП.', code: 'Б3.3.У1–Б3.3.У2, Б3.3.К1, Б3.3.В1' },
+  { id: 20, cat: 'incl', desc: 'Обговорювати з колегами способи запобігання професійному вигоранню та підтримувати доброзичливу атмосферу.', code: 'Б2.1.К1' },
+  { id: 21, cat: 'incl', desc: 'Взаємодіяти з колегами заради збереження особистого психічного і фізичного здоров\'я та заохочувати до цього інших.', code: 'В2.4.К1, В2.4.В1' }
+];
+
+const recommendations = {
+  dev: {
+    low: 'Розпочніть з активного включення у професійні спільноти закладу. Відвідуйте засідання методичних об\'єднань, запитуйте поради у досвідчених колег, ведіть рефлексивний щоденник педагога.',
+    mid: 'Ви вже активно розвиваєтесь. Спробуйте презентувати власний досвід на засіданнях спільноти, поділитися результатами відвіданих курсів, ініціювати обговорення актуальних проблем практики.',
+    high: 'Чудовий рівень! Станьте амбасадором професійного розвитку: запропонуйте створити проблемно-орієнтовану спільноту, проведіть внутрішній воркшоп, опублікуйте статтю у фаховому виданні.'
+  },
+  mentor: {
+    low: 'Дізнайтеся більше про інститут наставництва. Пропонуємо пройти курс з менторства, відвідати відкриті уроки колег, запропонувати допомогу молодим учителям у підборі матеріалів.',
+    mid: 'Ви вже допомагаєте колегам. Систематизуйте свою підтримку: станьте офіційним наставником, проводьте інтервізійні сесії, створіть банк методичних матеріалів для колег.',
+    high: 'Ви — експерт-наставник! Запровадьте школу супервізії у закладі, розробіть програму підтримки молодих педагогів, поділіться досвідом на рівні громади чи області.'
+  },
+  innov: {
+    low: 'Почніть з ознайомлення з сучасними освітніми інноваціями. Відвідайте вебінари, дослідіть досвід колег, спробуйте впровадити один новий метод на своєму уроці.',
+    mid: 'Ви вже апробуєте новації. Документуйте результати, діліться ними у спільноті, залучайте колег до спільних експериментів, створіть творчу групу з інновацій.',
+    high: 'Ви — інноваційний лідер! Очольте дослідно-експериментальну роботу закладу, публікуйте результати, виступайте на конференціях, масштабуйте успішний досвід.'
+  },
+  plan: {
+    low: 'Долучіться до колегіального планування. Обговоріть з колегами календарно-тематичне планування, узгодьте графіки контрольних робіт, вивчіть модельні навчальні програми.',
+    mid: 'Ви активно співпрацюєте. Беріть участь у розробленні робочих навчальних програм, пропонуйте інтегровані підходи, координуйте дії з учителями суміжних предметів.',
+    high: 'Ви — архітектор освітнього процесу! Очольте робочу групу з розроблення програм, забезпечте наступність між циклами навчання, візьміть відповідальність за якість програм закладу.'
+  },
+  digital: {
+    low: 'Розпочніть з реєстрації у професійних онлайн-спільнотах, створіть е-портфоліо, опануйте базові хмарні сервіси для співпраці (Google Workspace, Microsoft 365).',
+    mid: 'Ви впевнений цифровий користувач. Створюйте власні електронні ресурси, діліться ними з колегами, ініціюйте створення шкільного цифрового репозиторію.',
+    high: 'Ви — цифровий лідер! Запровадьте цифровий хаб закладу, навчайте колег, популяризуйте кібергігієну, розробляйте спільні цифрові освітні продукти.'
+  },
+  incl: {
+    low: 'Долучіться до роботи команди супроводу учнів з ООП, дізнайтеся про інструменти підтримки ментального здоров\'я, беріть участь у обговореннях профілактики вигорання.',
+    mid: 'Ви активно працюєте в команді. Беріть участь у розробленні ІПР, ініціюйте заходи підтримки добробуту колег, створюйте атмосферу психологічної безпеки.',
+    high: 'Ви — лідер культури добробуту! Запровадьте систему підтримки ментального здоров\'я в закладі, станьте фасилітатором інтервізійних груп, координуйте команду супроводу.'
+  }
+};
+
+let currentFilter = 'all';
+let ratings = {};
+
+function renderTabs() {
+  const container = document.getElementById('tabsContainer');
+  container.innerHTML = categories.map(cat => {
+    const isActive = currentFilter === cat.id;
+    const count = cat.id === 'all' ? items.length : items.filter(i => i.cat === cat.id).length;
+    return `
+      <button onclick="setFilter('${cat.id}')" class="px-4 py-2 rounded-xl font-semibold text-sm transition ${isActive ? 'tab-active shadow-lg' : 'bg-white text-gray-700 hover:bg-gray-100 shadow'}">
+        <span class="mr-1">${cat.icon}</span>${cat.name}
+        <span class="ml-2 px-2 py-0.5 rounded-full text-xs ${isActive ? 'bg-white/30' : 'bg-gray-200'}">${count}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function renderTable() {
+  const container = document.getElementById('tableContainer');
+  const filtered = currentFilter === 'all' ? items : items.filter(i => i.cat === currentFilter);
+  
+  // Group by category
+  const grouped = {};
+  filtered.forEach(item => {
+    if (!grouped[item.cat]) grouped[item.cat] = [];
+    grouped[item.cat].push(item);
+  });
+
+  let html = '';
+  
+  Object.keys(grouped).forEach(catId => {
+    const cat = categories.find(c => c.id === catId);
+    const catItems = grouped[catId];
+    
+    html += `
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden fade-in">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
+          <h3 class="text-xl font-bold">${cat.icon} ${cat.name}</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b-2 border-gray-200">
+              <tr>
+                <th class="text-left p-4 font-semibold text-gray-700 w-16">№</th>
+                <th class="text-left p-4 font-semibold text-gray-700">Конкретні обов'язки та дії педагога</th>
+                <th class="text-left p-4 font-semibold text-gray-700 w-32">Дескриптор</th>
+                <th class="text-center p-4 font-semibold text-gray-700 w-80">Рівень виконання</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    catItems.forEach((item, idx) => {
+      const rating = ratings[item.id];
+      html += `
+        <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+          <td class="p-4 text-center font-bold text-gray-600">${idx + 1}</td>
+          <td class="p-4 text-gray-800">${item.desc}</td>
+          <td class="p-4 text-center">
+            <span class="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-mono font-semibold">${item.code}</span>
+          </td>
+          <td class="p-4">
+            <div class="flex gap-2 justify-center">
+              <button onclick="setRating(${item.id}, 0)" class="radio-btn px-3 py-2 rounded-lg text-sm font-semibold border-2 ${rating === 0 ? 'selected bg-red-500 text-white border-red-600' : 'bg-white text-red-600 border-red-300 hover:bg-red-50'}">
+                😔 Не виконую
+              </button>
+              <button onclick="setRating(${item.id}, 1)" class="radio-btn px-3 py-2 rounded-lg text-sm font-semibold border-2 ${rating === 1 ? 'selected bg-yellow-500 text-white border-yellow-600' : 'bg-white text-yellow-700 border-yellow-300 hover:bg-yellow-50'}">
+                😐 Частково
+              </button>
+              <button onclick="setRating(${item.id}, 2)" class="radio-btn px-3 py-2 rounded-lg text-sm font-semibold border-2 ${rating === 2 ? 'selected bg-green-500 text-white border-green-600' : 'bg-white text-green-700 border-green-300 hover:bg-green-50'}">
+                😊 Постійно
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+    
+    html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function renderAnalytics() {
+  const container = document.getElementById('analyticsContainer');
+  const analytics = categories.filter(c => c.id !== 'all').map(cat => {
+    const catItems = items.filter(i => i.cat === cat.id);
+    const total = catItems.length * 2;
+    const current = catItems.reduce((sum, i) => sum + (ratings[i.id] !== undefined ? ratings[i.id] : 0), 0);
+    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+    return { ...cat, percent, total: catItems.length, rated: catItems.filter(i => ratings[i.id] !== undefined).length };
+  });
+
+  container.innerHTML = analytics.map(a => {
+    let status = '';
+    let statusColor = '';
+    if (a.rated === 0) { status = 'Не оцінено'; statusColor = 'text-gray-500'; }
+    else if (a.percent < 40) { status = 'Потребує розвитку'; statusColor = 'text-red-600'; }
+    else if (a.percent < 75) { status = 'Розвивається'; statusColor = 'text-yellow-600'; }
+    else { status = 'Високий рівень'; statusColor = 'text-green-600'; }
+
+    return `
+      <div class="bg-gray-50 rounded-xl p-4">
+        <div class="flex justify-between items-center mb-2">
+          <div class="font-semibold text-gray-800">${a.icon} ${a.name}</div>
+          <div class="text-right">
+            <div class="font-bold text-blue-600">${a.percent}%</div>
+            <div class="text-xs ${statusColor} font-medium">${status}</div>
+          </div>
+        </div>
+        <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div class="progress-bar h-full bg-gradient-to-r from-blue-400 to-blue-600" style="width: ${a.percent}%"></div>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">Оцінено: ${a.rated} / ${a.total}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateProgress() {
+  const ratedCount = Object.keys(ratings).length;
+  const total = items.length;
+  const sum = Object.values(ratings).reduce((a, b) => a + b, 0);
+  const maxSum = total * 2;
+  const percent = Math.round((sum / maxSum) * 100);
+
+  document.getElementById('overallPercent').textContent = percent + '%';
+  document.getElementById('completedCount').textContent = ratedCount;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('overallBar').style.width = percent + '%';
+
+  renderAnalytics();
+}
+
+function setRating(id, value) {
+  if (ratings[id] === value) {
+    delete ratings[id];
+  } else {
+    ratings[id] = value;
+  }
+  renderTable();
+  updateProgress();
+}
+
+function setFilter(id) {
+  currentFilter = id;
+  renderTabs();
+  renderTable();
+}
+
+function resetAll() {
+  if (confirm('Ви впевнені, що хочете скинути всі оцінки?')) {
+    ratings = {};
+    renderTable();
+    updateProgress();
+  }
+}
+
+function showRecommendations() {
+  const ratedCount = Object.keys(ratings).length;
+  if (ratedCount === 0) {
+    alert('Спочатку оцініть хоча б одну дію!');
+    return;
+  }
+
+  const content = document.getElementById('modalContent');
+  let html = '<div class="space-y-4">';
+
+  categories.filter(c => c.id !== 'all').forEach(cat => {
+    const catItems = items.filter(i => i.cat === cat.id);
+    const ratedItems = catItems.filter(i => ratings[i.id] !== undefined);
+    if (ratedItems.length === 0) return;
+
+    const avg = ratedItems.reduce((s, i) => s + ratings[i.id], 0) / ratedItems.length;
+    let level, rec;
+    if (avg < 0.7) { level = 'low'; rec = recommendations[cat.id].low; }
+    else if (avg < 1.5) { level = 'mid'; rec = recommendations[cat.id].mid; }
+    else { level = 'high'; rec = recommendations[cat.id].high; }
+
+    const levelLabels = { low: '🔴 Початковий', mid: '🟡 Середній', high: '🟢 Високий' };
+    const levelColors = { low: 'bg-red-50 border-red-300', mid: 'bg-yellow-50 border-yellow-300', high: 'bg-green-50 border-green-300' };
+
+    html += `
+      <div class="border-2 rounded-xl p-4 ${levelColors[level]}">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-bold text-gray-800">${cat.icon} ${cat.name}</h4>
+          <span class="text-sm font-semibold">${levelLabels[level]}</span>
+        </div>
+        <p class="text-sm text-gray-700 leading-relaxed">${rec}</p>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  html += `
+    <div class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
+      <p class="text-sm text-gray-700"><strong>💡 Порада:</strong> Зосередьтеся на 1–2 напрямах розвитку за квартал. Використовуйте ресурси професійних спільнот для підтримки свого зростання.</p>
+    </div>
+  `;
+
+  content.innerHTML = html;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+// Init
+renderTabs();
+renderTable();
+updateProgress();
+</script>
+
+</body>
+</html>
